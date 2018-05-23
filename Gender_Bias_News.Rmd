@@ -1,0 +1,473 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Cmd+Shift+Enter*. 
+
+
+```{r}
+library(tidyverse)
+
+filepath = "./articles_train.csv"
+filepath_sent = "./articles_train_sent.csv"
+```
+
+```{r}
+articles_train <- 
+  read_csv(filepath)
+
+articles_train_sent <-
+  read_csv(filepath_sent)
+```
+
+
+
+
+```{r}
+head(articles_train)
+head(articles_train_sent)
+```
+
+
+```{r}
+articles_train %>% 
+  ggplot(aes(publication)) +
+  geom_bar() +
+  theme(axis.text.x = element_text(angle = 80, vjust = .6))
+```
+
+```{r}
+articles_train <-
+  articles_train %>% 
+  mutate(length = str_length(content))
+```
+
+```{r}
+articles_train %>% 
+  count(length)
+```
+
+```{r}
+articles_train %>% 
+  count(length) %>% 
+  arrange(desc(length))
+```
+
+```{r}
+summary(articles_train)
+```
+
+```{r}
+articles_train %>% 
+  filter(!is.na(length)) %>% 
+  summarise(unique_authors = n_distinct(author))
+```
+
+There are at least 12,583 unique authors (or whose names appear in unique ways).
+
+
+
+```{r}
+med_length <- median(articles_train$length, na.rm = TRUE)
+mean_length <- mean(articles_train$length, na.rm = TRUE)
+
+articles_summary <-
+  tribble(
+    ~summary, ~value,
+    "median length", med_length,
+    "mean length", mean_length
+  )
+
+articles_train %>% 
+  filter(length < 25000) %>% 
+  ggplot(aes(length)) +
+  geom_histogram(binwidth = 250) +
+  geom_vline(data = articles_summary, aes(xintercept = value, color = summary))
+```
+
+```{r}
+train_split <-
+  articles_train_sent %>% 
+  unnest(sentences)
+```
+
+```{r}
+train_split %>% head()
+```
+
+
+```{r}
+train_split <-
+  articles_train_sent %>% 
+  separate_rows(sentences, sep = "\\['|', '|'\\]")
+```
+
+
+['
+
+', '
+
+']
+
+
+```{r}
+train_split <- 
+  articles_train_sent %>% 
+  select(-X1, -`Unnamed: 0`, -content, -sent) %>% 
+  separate_rows(sentences, sep = "\\['|', '|'\\]")
+```
+
+
+```{r}
+train_split %>% head()
+```
+
+
+```{r}
+summary(train_split)
+```
+
+
+```{r}
+train_split <-
+  train_split %>% 
+  rename(sentence = sentences) %>% 
+  mutate(chr_length = str_length(sentence))
+```
+
+Let's get rid of spaces and spare punctuation.
+
+```{r}
+train_split <-
+  train_split %>% 
+  filter(chr_length > 3)
+```
+
+
+```{r}
+summary(train_split)
+```
+
+
+```{r}
+train_split %>% 
+  write_csv(path = "articles_train_sent_split.csv")
+```
+
+
+
+```{r}
+train_split %>% 
+  filter(chr_length == 200)
+```
+
+
+
+```{r}
+train_split %>% 
+  filter(chr_length < 500) %>% 
+  ggplot(aes(chr_length)) +
+  geom_histogram(binwidth = 20)
+```
+
+
+```{r}
+train_split_test
+```
+
+```{r}
+train_filter <- 
+  train_split %>% 
+  mutate(sentence_lower = str_to_lower(sentence)) %>% 
+  filter(str_detect(sentence, "(^| )(s?he|hi[ms]|hers?)($| )"))
+```
+
+```{r}
+train_filter
+```
+
+
+```{r}
+train_gender <- 
+  train_split %>% 
+  mutate(
+    sentence_lower = str_to_lower(sentence),
+    male = str_count(sentence_lower, "(^|[:space:])(he(\\'[a-z]{1,2})?|hi[ms])($|[:space:]|[:punct:])"),
+    female = str_count(sentence_lower, "(^|[:space:])(she(\\'[a-z]{1,2})?|hers?)($|[:space:]|[:punct:])")
+  )
+```
+
+NEED TO ADD himself and herself
+
+
+```{r}
+train_degendered <- 
+  train_split %>% 
+  mutate(
+    sentence_lower = str_to_lower(sentence),
+    male = str_count(sentence_lower, "(\\b)(he(\\'[a-z]{1,2})?|hi[ms]|himself)(\\b)"),
+    female = str_count(sentence_lower, "(\\b)(she(\\'[a-z]{1,2})?|hers?|herself)(\\b)"),
+    sentence_degendered = str_replace_all(sentence, "(\\b)([sS]?[hH][eE](?:\\'[a-z]{1,2})?|[hH][iI][mMsS]|[hH][eE][rR][sS]?|([hH][iI][mM]|[hH][eE][rR])[sS][eE][lL][fF])(\\b)", "it")
+  )
+```
+
+```{r}
+train_degendered %>% 
+  head()
+```
+
+
+
+
+```{r}
+train_gender %>% 
+  filter(male != female)
+```
+
+```{r}
+train_gender_dominant <-
+  train_gender %>% 
+  filter(male != female)
+```
+
+```{r}
+train_degendered_dominant <-
+  train_degendered %>% 
+  filter(male != female)
+```
+
+
+```{r}
+train_gender_dominant %>% 
+  count(male, female) 
+```
+
+```{r}
+train_gender_dominant <-
+  train_gender_dominant %>% 
+  mutate(
+    male_dominant = male - female,
+    exclusive_gender = if_else(female == 0, 'male', if_else(male == 0, 'female', 'neither'))
+  )
+```
+
+```{r}
+train_degendered_dominant <-
+  train_degendered_dominant %>% 
+  mutate(
+    male_dominant = male - female,
+    exclusive_gender = if_else(female == 0, 'male', if_else(male == 0, 'female', 'neither'))
+  )
+```
+
+
+```{r}
+train_gender_dominant %>% 
+  count(male, female, exclusive_gender) 
+```
+
+
+```{r}
+train_gender_dominant %>% 
+  #filter(male_dominant <= 10 && male_dominant >= -10) %>% 
+  ggplot(aes(male_dominant, fill = exclusive_gender)) +
+  geom_bar(position = 'stack') +
+  coord_cartesian(xlim = c(-10, 10))
+```
+
+```{r}
+train_gender_dominant %>% 
+  count(exclusive_gender)
+```
+
+
+```{r}
+train_gender_dominant %>% 
+  count(exclusive_gender)
+```
+
+```{r}
+train_gender_exclusive <-
+  train_gender_dominant %>% 
+  filter(exclusive_gender != "neither")
+```
+
+```{r}
+train_degendered_exclusive <-
+  train_degendered_dominant %>% 
+  filter(exclusive_gender != "neither")
+```
+
+```{r}
+summary(train_degendered_exclusive)
+```
+
+
+```{r}
+train_degendered_exclusive %>% head()
+```
+
+
+```{r}
+train_degendered_exclusive %>% 
+  count(chr_length)
+```
+
+```{r}
+train_degendered_exclusive %>% 
+  arrange(desc(chr_length))
+```
+
+```{r}
+train_degendered_exclusive %>% 
+  arrange(chr_length)
+```
+
+```{r}
+train_degendered_exclusive %>% 
+  filter(chr_length == 10)
+```
+
+```{r}
+train_degendered_exclusive %>% 
+  filter(chr_length == 20)
+```
+
+```{r}
+train_degendered %>% 
+  count(chr_length)
+```
+
+```{r}
+train_degendered_filtered <-
+  train_degendered_exclusive %>% 
+  filter(
+    chr_length >= 20,
+    chr_length <= 1000
+  )
+```
+
+```{r}
+train_degendered_filtered %>% 
+  ggplot(aes(chr_length)) +
+  geom_histogram(binwidth = 20)
+```
+
+```{r}
+train_degendered_filtered_narrow <-
+  train_degendered_filtered %>% 
+  select(
+    sentence = sentence_degendered,
+    gender = exclusive_gender,
+    male_count = male,
+    female_count = female,
+    publication,
+    author,
+    title,
+    id
+  )
+```
+
+```{r}
+train_degendered_filtered_narrow %>% 
+  head()
+```
+
+
+```{r}
+train_degendered_filtered_narrow %>% 
+  write_csv(path = "articles_train_degendered_filtered.csv")
+```
+
+
+```{r}
+summary(train_degendered_filtered_narrow)
+```
+
+
+```{r}
+train_degendered_filtered %>% head()
+```
+
+
+SELECT exclusive_gender, degendered_sentence, author, publication, male, female, title, id
+
+
+```{r}
+train_degendered %>% 
+  filter(chr_length < 5000) %>% 
+  ggplot(aes(chr_length)) +
+  geom_histogram(binwidth = 20)
+```
+
+1000 is max chr_length
+
+
+```{r}
+summary(train_degendered)
+```
+
+
+
+exclusive_gender, degendered_sentence, author, publication, male, female, title, id
+
+
+```{r}
+train_gender_exclusive_her <-
+  train_gender_exclusive %>% 
+  mutate(num_her = str_count(sentence_lower, "(^|[:space:])(her)($|[:space:]|[:punct:])"))
+```
+
+```{r}
+train_gender_exclusive_hers <-
+  train_gender_exclusive %>% 
+  mutate(num_hers = str_count(sentence_lower, "(^|[:space:])(hers)($|[:space:]|[:punct:])"))
+```
+
+
+```{r}
+train_gender_exclusive_him <-
+  train_gender_exclusive %>% 
+  mutate(num_him = str_count(sentence_lower, "(^|[:space:])(him)($|[:space:]|[:punct:])"))
+```
+
+```{r}
+train_gender_exclusive_his <-
+  train_gender_exclusive %>% 
+  mutate(num_his = str_count(sentence_lower, "(^|[:space:])(his)($|[:space:]|[:punct:])"))
+```
+
+
+```{r}
+train_gender_exclusive_her %>% 
+  count(num_her > 0)
+```
+
+```{r}
+train_gender_exclusive_hers %>% 
+  count(num_hers > 0)
+```
+
+118469 her, 455 hers, 86340 him, 287382 his
+
+
+```{r}
+train_gender_exclusive_him %>% 
+  count(num_him > 0)
+```
+
+```{r}
+train_gender_exclusive_his %>% 
+  count(num_his > 0)
+```
+
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Cmd+Option+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Cmd+Shift+K* to preview the HTML file). 
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
+
