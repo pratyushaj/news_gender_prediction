@@ -175,8 +175,11 @@
   },
   {
    "cell_type": "code",
+<<<<<<< HEAD
    "execution_count": 11,
+=======
    "execution_count": 128,
+>>>>>>> e0d083d24ac6c58b2262a62c0dfe27fe6e0e4eaa
    "metadata": {},
    "outputs": [],
    "source": [
@@ -186,6 +189,7 @@
   },
   {
    "cell_type": "code",
+<<<<<<< HEAD
    "execution_count": 14,
    "metadata": {},
    "outputs": [
@@ -1207,7 +1211,9 @@
   {
    "cell_type": "code",
    "execution_count": 12,
+=======
    "execution_count": 129,
+>>>>>>> e0d083d24ac6c58b2262a62c0dfe27fe6e0e4eaa
    "metadata": {},
    "outputs": [],
    "source": [
